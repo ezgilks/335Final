@@ -3,34 +3,26 @@ const Plan = require("../models/Plan");
 
 const router = express.Router();
 
-function weatherText(code) {
-  const labels = {
-    0: "Clear sky",
-    1: "Mostly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Fog",
-    48: "Depositing rime fog",
-    51: "Light drizzle",
-    53: "Moderate drizzle",
-    55: "Dense drizzle",
-    61: "Slight rain",
-    63: "Moderate rain",
-    65: "Heavy rain",
-    71: "Slight snow",
-    73: "Moderate snow",
-    75: "Heavy snow",
-    80: "Slight rain showers",
-    81: "Moderate rain showers",
-    82: "Violent rain showers",
-    95: "Thunderstorm"
-  };
+function weatherText(description) {
+  if (!description) {
+    return "Weather data available";
+  }
 
-  return labels[code] || "Weather data available";
+  return description;
 }
 
-function workoutAdvice(temp, wind, code) {
-  if (code >= 61 && code <= 82) {
+function cleanNumber(value) {
+  if (!value) {
+    return 0;
+  }
+
+  return Number(String(value).replace("+", "").replace("°F", "").trim());
+}
+
+function workoutAdvice(temp, wind, description) {
+  const lowerDescription = description ? description.toLowerCase() : "";
+
+  if (lowerDescription.includes("rain") || lowerDescription.includes("shower") || lowerDescription.includes("storm")) {
     return "Rain is likely, so an indoor gym session is the safer plan.";
   }
   if (temp <= 40) {
@@ -49,61 +41,70 @@ function workoutAdvice(temp, wind, code) {
 async function getWeather(city) {
   const cleanCity = city.trim();
 
-  const geoUrl =
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanCity)}&count=1&language=en&format=json`;
-
-  console.log("Geocoding URL:", geoUrl);
-
-  const geoResponse = await fetch(geoUrl);
-
-  console.log("Geocoding status:", geoResponse.status);
-
-  if (!geoResponse.ok) {
-    const geoErrorText = await geoResponse.text();
-    console.log("Geocoding API error:", geoErrorText);
-    throw new Error("Could not reach the location lookup API.");
-  }
-
-  const geoData = await geoResponse.json();
-
-  if (!geoData.results || geoData.results.length === 0) {
-    throw new Error("City was not found. Try a larger nearby city.");
-  }
-
-  const place = geoData.results[0];
-
-  const weatherUrl =
-    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current_weather=true&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+  const weatherUrl = `https://wttr.in/${encodeURIComponent(cleanCity)}?format=j1`;
 
   console.log("Weather URL:", weatherUrl);
 
-  const weatherResponse = await fetch(weatherUrl);
+  const weatherResponse = await fetch(weatherUrl, {
+    headers: {
+      "User-Agent": "LiftWeatherPlanner/1.0"
+    }
+  });
 
   console.log("Weather status:", weatherResponse.status);
 
   if (!weatherResponse.ok) {
     const weatherErrorText = await weatherResponse.text();
     console.log("Weather API error:", weatherErrorText);
-    throw new Error("Could not reach the weather forecast API.");
+    throw new Error("Could not reach the weather API.");
   }
 
   const weatherData = await weatherResponse.json();
 
-  if (!weatherData.current_weather) {
+  if (!weatherData.current_condition || weatherData.current_condition.length === 0) {
     console.log("Unexpected weather data:", weatherData);
     throw new Error("Weather data came back in an unexpected format.");
   }
 
-  const current = weatherData.current_weather;
-  const code = current.weathercode;
+  const current = weatherData.current_condition[0];
+  const area = weatherData.nearest_area && weatherData.nearest_area[0];
+
+  const description =
+    current.weatherDesc && current.weatherDesc[0] && current.weatherDesc[0].value
+      ? current.weatherDesc[0].value
+      : "Weather data available";
+
+  const temp = cleanNumber(current.temp_F);
+  const wind = cleanNumber(current.windspeedMiles);
+
+  let resolvedCity = cleanCity;
+
+  if (area) {
+    const areaName =
+      area.areaName && area.areaName[0] && area.areaName[0].value
+        ? area.areaName[0].value
+        : cleanCity;
+
+    const region =
+      area.region && area.region[0] && area.region[0].value
+        ? area.region[0].value
+        : "";
+
+    const country =
+      area.country && area.country[0] && area.country[0].value
+        ? area.country[0].value
+        : "";
+
+    resolvedCity = `${areaName}${region ? ", " + region : ""}${country ? ", " + country : ""}`;
+  }
 
   return {
-    resolvedCity: `${place.name}${place.admin1 ? ", " + place.admin1 : ""}${place.country ? ", " + place.country : ""}`,
-    temperature: current.temperature,
-    windSpeed: current.windspeed,
-    weatherCode: code,
-    weatherSummary: weatherText(code),
-    advice: workoutAdvice(current.temperature, current.windspeed, code)
+    resolvedCity,
+    temperature: temp,
+    windSpeed: wind,
+    weatherCode: 0,
+    weatherSummary: weatherText(description),
+    advice: workoutAdvice(temp, wind, description)
   };
 }
 
@@ -178,7 +179,7 @@ router.get("/plans/:id", async (req, res) => {
       });
     }
 
-    const advice = workoutAdvice(plan.temperature, plan.windSpeed, plan.weatherCode);
+    const advice = workoutAdvice(plan.temperature, plan.windSpeed, plan.weatherSummary);
 
     res.render("detail", {
       title: "Plan Saved",
