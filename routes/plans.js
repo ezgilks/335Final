@@ -47,37 +47,63 @@ function workoutAdvice(temp, wind, code) {
 }
 
 async function getWeather(city) {
-  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+  const cleanCity = city.trim();
+
+  const geoUrl =
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanCity)}&count=1&language=en&format=json`;
+
+  console.log("Geocoding URL:", geoUrl);
+
   const geoResponse = await fetch(geoUrl);
 
+  console.log("Geocoding status:", geoResponse.status);
+
   if (!geoResponse.ok) {
+    const geoErrorText = await geoResponse.text();
+    console.log("Geocoding API error:", geoErrorText);
     throw new Error("Could not reach the location lookup API.");
   }
 
   const geoData = await geoResponse.json();
+
   if (!geoData.results || geoData.results.length === 0) {
     throw new Error("City was not found. Try a larger nearby city.");
   }
 
   const place = geoData.results[0];
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+
+  const weatherUrl =
+    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current_weather=true&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+
+  console.log("Weather URL:", weatherUrl);
+
   const weatherResponse = await fetch(weatherUrl);
 
+  console.log("Weather status:", weatherResponse.status);
+
   if (!weatherResponse.ok) {
+    const weatherErrorText = await weatherResponse.text();
+    console.log("Weather API error:", weatherErrorText);
     throw new Error("Could not reach the weather forecast API.");
   }
 
   const weatherData = await weatherResponse.json();
-  const current = weatherData.current;
-  const code = current.weather_code;
+
+  if (!weatherData.current_weather) {
+    console.log("Unexpected weather data:", weatherData);
+    throw new Error("Weather data came back in an unexpected format.");
+  }
+
+  const current = weatherData.current_weather;
+  const code = current.weathercode;
 
   return {
     resolvedCity: `${place.name}${place.admin1 ? ", " + place.admin1 : ""}${place.country ? ", " + place.country : ""}`,
-    temperature: current.temperature_2m,
-    windSpeed: current.wind_speed_10m,
+    temperature: current.temperature,
+    windSpeed: current.windspeed,
     weatherCode: code,
     weatherSummary: weatherText(code),
-    advice: workoutAdvice(current.temperature_2m, current.wind_speed_10m, code)
+    advice: workoutAdvice(current.temperature, current.windspeed, code)
   };
 }
 
@@ -103,8 +129,8 @@ router.post("/plans", async (req, res) => {
     const weather = await getWeather(city);
 
     const newPlan = new Plan({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       city: weather.resolvedCity,
       splitType,
       workoutFocus,
@@ -153,6 +179,7 @@ router.get("/plans/:id", async (req, res) => {
     }
 
     const advice = workoutAdvice(plan.temperature, plan.windSpeed, plan.weatherCode);
+
     res.render("detail", {
       title: "Plan Saved",
       plan,
