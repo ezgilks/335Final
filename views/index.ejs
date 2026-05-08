@@ -1,0 +1,72 @@
+<%- include("partials_header", { title }) %>
+
+<section class="hero">
+  <div>
+    <p class="eyebrow">Plan smarter before training</p>
+    <h1>Build a workout plan using live weather data.</h1>
+    <p class="lead">Enter your city and training focus. The app saves your plan in MongoDB and adds current weather from Open-Meteo.</p>
+  </div>
+</section>
+
+<% if (error) { %>
+  <div class="alert"><%= error %></div>
+<% } %>
+
+<section class="grid two-col">
+  <article class="card">
+    <h2>Create a plan</h2>
+    <form method="POST" action="/plans" class="plan-form">
+      <label>Name
+        <input type="text" name="name" value="<%= formData.name || '' %>" required>
+      </label>
+
+      <label>Email
+        <input type="email" name="email" value="<%= formData.email || '' %>" required>
+      </label>
+
+      <label>City
+        <input type="text" name="city" placeholder="College Park" value="<%= formData.city || '' %>" required>
+      </label>
+
+      <label>Split Type
+        <select name="splitType" required>
+          <% const selected = formData.splitType || ''; %>
+          <option value="">Choose one</option>
+          <option <%= selected === 'Upper/Lower' ? 'selected' : '' %>>Upper/Lower</option>
+          <option <%= selected === 'Push Pull Legs' ? 'selected' : '' %>>Push Pull Legs</option>
+          <option <%= selected === 'Full Body' ? 'selected' : '' %>>Full Body</option>
+          <option <%= selected === 'Arnold Split' ? 'selected' : '' %>>Arnold Split</option>
+          <option <%= selected === 'Anterior/Posterior' ? 'selected' : '' %>>Anterior/Posterior</option>
+        </select>
+      </label>
+
+      <label>Workout Focus
+        <input type="text" name="workoutFocus" placeholder="Heavy upper, legs, conditioning..." value="<%= formData.workoutFocus || '' %>" required>
+      </label>
+
+      <label>Notes
+        <textarea name="notes" rows="4" placeholder="Add any extra details"><%= formData.notes || '' %></textarea>
+      </label>
+
+      <button type="submit">Save Plan</button>
+    </form>
+  </article>
+
+  <aside class="card side-card">
+    <h2>Recent saved plans</h2>
+    <% if (recentPlans.length === 0) { %>
+      <p>No plans saved yet.</p>
+    <% } else { %>
+      <ul class="simple-list">
+        <% recentPlans.forEach((plan) => { %>
+          <li>
+            <a href="/plans/<%= plan._id %>"><strong><%= plan.workoutFocus %></strong></a>
+            <span><%= plan.city %> · <%= plan.temperature %>°F</span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </aside>
+</section>
+
+<%- include("partials_footer") %>

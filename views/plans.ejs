@@ -1,0 +1,33 @@
+<%- include("partials_header", { title }) %>
+
+<section class="card">
+  <h1>Saved Plans</h1>
+  <p>Search by email to retrieve one person's saved workout plans from MongoDB.</p>
+
+  <form method="GET" action="/plans" class="search-form">
+    <input type="email" name="email" placeholder="student@example.com" value="<%= email %>">
+    <button type="submit">Search</button>
+    <a class="button-light" href="/plans">Show All</a>
+  </form>
+</section>
+
+<section class="plans-stack">
+  <% if (plans.length === 0) { %>
+    <div class="card"><p>No saved plans matched that search.</p></div>
+  <% } %>
+
+  <% plans.forEach((plan) => { %>
+    <article class="card plan-row">
+      <div>
+        <h2><a href="/plans/<%= plan._id %>"><%= plan.workoutFocus %></a></h2>
+        <p><%= plan.splitType %> · <%= plan.city %></p>
+        <p class="muted"><%= plan.weatherSummary %>, <%= plan.temperature %>°F, wind <%= plan.windSpeed %> mph</p>
+      </div>
+      <form method="POST" action="/plans/<%= plan._id %>/delete" onsubmit="return confirm('Delete this saved plan?');">
+        <button class="danger" type="submit">Delete</button>
+      </form>
+    </article>
+  <% }) %>
+</section>
+
+<%- include("partials_footer") %>

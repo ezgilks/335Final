@@ -1,0 +1,39 @@
+<%- include("partials_header", { title }) %>
+
+<section class="card result-card">
+  <p class="eyebrow">Plan saved</p>
+  <h1><%= plan.workoutFocus %></h1>
+  <p class="lead"><%= advice %></p>
+
+  <div class="stat-grid">
+    <div>
+      <span>Split</span>
+      <strong><%= plan.splitType %></strong>
+    </div>
+    <div>
+      <span>Location</span>
+      <strong><%= plan.city %></strong>
+    </div>
+    <div>
+      <span>Temperature</span>
+      <strong><%= plan.temperature %>°F</strong>
+    </div>
+    <div>
+      <span>Wind</span>
+      <strong><%= plan.windSpeed %> mph</strong>
+    </div>
+  </div>
+
+  <h2>Weather</h2>
+  <p><%= plan.weatherSummary %></p>
+
+  <h2>Notes</h2>
+  <p><%= plan.notes || "No extra notes added." %></p>
+
+  <div class="actions">
+    <a class="button-light" href="/">Create another</a>
+    <a class="button-light" href="/plans?email=<%= encodeURIComponent(plan.email) %>">View this user's plans</a>
+  </div>
+</section>
+
+<%- include("partials_footer") %>
